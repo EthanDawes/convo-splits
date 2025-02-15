@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getPeople, save } from '$lib/storage';
+	import { goto } from '$app/navigation';
 
 	let people = getPeople();
 	let selectedPeople: Record<string, boolean> = {};
@@ -12,7 +13,11 @@
 	}
 
 	function submitForm() {
-		console.log("Selected people:", Object.keys(selectedPeople).filter(person => selectedPeople[person]));
+		// TODO: make selection order count?
+		const people = Object.keys(selectedPeople)
+			.filter(person => selectedPeople[person])
+			.join(",");
+		goto(`/track?people=${people}&session=${new Date().toISOString()}`)
 	}
 </script>
 
