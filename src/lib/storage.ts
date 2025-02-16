@@ -36,3 +36,12 @@ export function getAllSessions(): Session[] {
 export function getSessionsWith(person: string) {
 	return getAllSessions().filter(session => person in session.interlocutors);
 }
+
+/** Gets session with specified date. If nonexistant, returns blank session */
+export function getDatedSession(date: string) {
+	return getAllSessions().filter(session => date === session.date)[0] ?? {
+		interlocutors: {},
+		date: date,
+		duration: 0,
+	};
+}
