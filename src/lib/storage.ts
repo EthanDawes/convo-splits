@@ -1,58 +1,47 @@
-import Dexie, { type EntityTable } from 'dexie';
+// Mapping of speaker name to seconds spoken
+export type Interlocutors = Record<string, number>;
 
-// Mapping of speaker name to seconds spoken within a session
-export type Interlocutors = Record<string, PersonSession>;
-
-export type Session = PersonSession[];
-
-// A person speaking during a session (saved in database)
-export interface PersonSession {
-	id: number,
-	name: string,
-	// ISO datetime string, representing a yap sesh
+export interface Session {
+	// ISO datetime string
 	date: string,
-	// Seconds speaking during a session
+	// Length of yap sesh in seconds
 	duration: number,
+	// Since people can speak simultaneously, this can be greater than `duration`
+	interlocutors: Interlocutors,
 }
 
 const interlocutorsKey = "interlocutors";
-
-export const db = new Dexie('ConvoSplitDatabase') as Dexie & {
-	personSessions: EntityTable<
-		PersonSession,
-		'id' // primary key "id" (for the typings only)
-	>;
-};
-
-// Schema declaration:
-db.version(1).stores({
-	personSession: '++id, name, date, duration',
-});
-
-export function toInterlocutors(session: Session) {
-	const interlocutors: Interlocutors = {};
-	session.forEach(speaker => interlocutors[speaker.name] = speaker);
-	return interlocutors;
-}
+const sessionsKey = "sessions"
 
 export function getPeople(): Interlocutors {
 	return JSON.parse(localStorage.getItem(interlocutorsKey) ?? "{}");
 }
 
-export function save(personSession: PersonSession) {
-	db.personSessions.put(personSession);
+export function save(people: Interlocutors): void;
+export function save(session: Session): void;
+export function save(thing: Interlocutors | Session) {
+	if ("interlocutors" in thing) {
+		const sessions = getAllSessions();
+		sessions.push(thing as Session);
+		localStorage.setItem(sessionsKey, JSON.stringify(sessions));
+	} else {
+		localStorage.setItem(interlocutorsKey, JSON.stringify(thing));
+	}
+}
+
+export function getAllSessions(): Session[] {
+	return JSON.parse(localStorage.getItem(sessionsKey) ?? "[]");
 }
 
 export function getSessionsWith(person: string) {
-	return db.personSessions.where("name")
-		.equals(person)
-		.toArray();
+	return getAllSessions().filter(session => person in session.interlocutors);
 }
 
-/** Gets session with specified date. If nonexistent, returns blank session */
-export function getSessionInterlocutors(date: string) {
-	return db.personSessions.where("date")
-		.equals(date)
-		.toArray()
-		.then(toInterlocutors)
+/** Gets session with specified date. If nonexistant, returns blank session */
+export function getDatedSession(date: string) {
+	return getAllSessions().filter(session => date === session.date)[0] ?? {
+		interlocutors: {},
+		date: date,
+		duration: 0,
+	};
 }

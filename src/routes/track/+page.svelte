@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { getSessionInterlocutors, save } from '$lib/storage';
-	import { promiseStore } from '$lib';
+	import { getDatedSession, save, type Session } from '$lib/storage';
 
 	const searchOptions = new URLSearchParams(location.search);
 	const people = searchOptions.get("people")!.split(",");
 	const startTime = searchOptions.get("session") ?? new Date().toUTCString();
 
-	const interlocutors = promiseStore({}, getSessionInterlocutors(startTime));
+	const session: Session = getDatedSession(startTime);
+	people.forEach(person => !(person in session.interlocutors) && (session.interlocutors[person] = 0));
 
 	// Mapping of person to timestamp (ms since epoch) they started speaking contiguously
 	const speakingSince = constructPersonMapping(0);
@@ -28,9 +28,9 @@
 	}
 
 	function handleSpeakerEnd(person: string) {
-		$interlocutors[person].duration += (new Date().getTime() - speakingSince[person]) / 1000;
+		session.interlocutors[person] += (new Date().getTime() - speakingSince[person]) / 1000;
 		speakingSince[person] = 0;
-		save($interlocutors[person]);
+		save(session);
 	}
 
 	/** User tried to click the name */
@@ -55,7 +55,7 @@
 				 on:mousedown={handleMouseDown}
 				 on:touchend|preventDefault={handleSpeakerEnd.bind(null, person)}>
 			<strong>{person}</strong>
-			<em>{formatDuration($interlocutors[person].duration)}</em>
+			<em>{formatDuration(session.interlocutors[person])}</em>
 		</div>
 	{/each}
 </div>
