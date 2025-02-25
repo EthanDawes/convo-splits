@@ -14,10 +14,11 @@
 
 	function submitForm() {
 		// TODO: make selection order count?
+		// TODO: make a derived store anchor href
 		const people = Object.keys(selectedPeople)
 			.filter(person => selectedPeople[person])
 			.join(",");
-		goto(`/track?people=${people}&session=${new Date().toISOString()}`)
+		goto(`/track?people=${people}`);
 	}
 </script>
 

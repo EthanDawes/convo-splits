@@ -31,5 +31,8 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"dependencies": {
+		"dexie": "^4.0.11"
 	}
 }

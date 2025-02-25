@@ -1,21 +1,31 @@
 <script lang="ts">
-	import { getDatedSession, save, type Session } from '$lib/storage';
+	import { getDatedSession, save, type SpeakerDurations } from '$lib/storage';
+	import { promiseStore } from '$lib';
 
 	const searchOptions = new URLSearchParams(location.search);
 	const people = searchOptions.get("people")!.split(",");
-	const startTime = searchOptions.get("session") ?? new Date().toUTCString();
 
-	const session: Session = getDatedSession(startTime);
-	people.forEach(person => !(person in session.interlocutors) && (session.interlocutors[person] = 0));
+	if (!searchOptions.get("session")) {
+		searchOptions.set("session", String(new Date().getTime()));
+		history.replaceState(null, "", "?" + searchOptions.toString());
+	}
+	const startTime = parseInt(searchOptions.get("session")!);
+
+	const session = promiseStore(null, getDatedSession(startTime).then(session => {
+		populateMissingSpeakerDurations(session.speakerDurations);
+		return session;
+	}));
+
 
 	// Mapping of person to timestamp (ms since epoch) they started speaking contiguously
-	const speakingSince = constructPersonMapping(0);
+	const speakingSince = populateMissingSpeakerDurations();
 
 	let isLandscape = false;
 	calcLandscape();
 
-	function constructPersonMapping<T>(defaultVal: T) {
-		return Object.fromEntries(people.map(person => [person, defaultVal]));
+	function populateMissingSpeakerDurations(dst: SpeakerDurations = {}) {
+		people.forEach(person => !(person in dst) && (dst[person] = 0));
+		return dst;
 	}
 
 	/* Modifies the `isLandscape` state variable based on window aspect ratio */
@@ -28,9 +38,10 @@
 	}
 
 	function handleSpeakerEnd(person: string) {
-		session.interlocutors[person] += (new Date().getTime() - speakingSince[person]) / 1000;
+		if (!$session) return;
+		$session.speakerDurations[person] += (new Date().getTime() - speakingSince[person]) / 1000;
 		speakingSince[person] = 0;
-		save(session);
+		save($session);
 	}
 
 	/** User tried to click the name */
@@ -53,9 +64,12 @@
 				 class:w-full={!isLandscape} class:h-full={isLandscape} class:bg-gray-300={speakingSince[person]}
 				 on:touchstart|preventDefault={handleSpeakerBegin.bind(null, person)}
 				 on:mousedown={handleMouseDown}
-				 on:touchend|preventDefault={handleSpeakerEnd.bind(null, person)}>
+				 on:touchend|preventDefault={handleSpeakerEnd.bind(null, person)}
+				 role="button">
 			<strong>{person}</strong>
-			<em>{formatDuration(session.interlocutors[person])}</em>
+			{#if $session != null}
+				<em>{formatDuration($session.speakerDurations[person])}</em>
+			{/if}
 		</div>
 	{/each}
 </div>

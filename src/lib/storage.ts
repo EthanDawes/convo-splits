@@ -1,47 +1,73 @@
+import Dexie, { type EntityTable, type InsertType } from 'dexie';
+
+// Seconds elapsed
+export type Duration = number;
+
+// Person name
+export type Name = string;
+
+// Milliseconds since epoch
+export type SessionDate = number;
+
 // Mapping of speaker name to seconds spoken
-export type Interlocutors = Record<string, number>;
+export type SpeakerDurations = Record<Name, Duration>;
 
 export interface Session {
-	// ISO datetime string
-	date: string,
+	// IndexedDB id (autoincremented)
+	id: number,
+	// Date the session started
+	date: SessionDate,
 	// Length of yap sesh in seconds
-	duration: number,
+	totalDuration: Duration,
+	// All conversation participants (identical to keys of `speakerDurations`, useful for indexed search)
+	interlocutors: Name[],
 	// Since people can speak simultaneously, this can be greater than `duration`
-	interlocutors: Interlocutors,
+	speakerDurations: SpeakerDurations,
 }
 
 const interlocutorsKey = "interlocutors";
-const sessionsKey = "sessions"
 
-export function getPeople(): Interlocutors {
+export const db = new Dexie('ConvoSplitDatabase') as Dexie & {
+	sessions: EntityTable<
+		Session,
+		'id' // primary key "id" (for the typings only)
+	>;
+};
+
+// Schema declaration:
+db.version(1).stores({
+	sessions: '++id, date, totalDuration, *interlocutors',
+});
+
+export function getPeople(): SpeakerDurations {
 	return JSON.parse(localStorage.getItem(interlocutorsKey) ?? "{}");
 }
 
-export function save(people: Interlocutors): void;
-export function save(session: Session): void;
-export function save(thing: Interlocutors | Session) {
+type InsertSession = InsertType<Session, "id">;
+export function save(people: SpeakerDurations): Promise<void>;
+/** Saves or updates a session. If `id` unset, will create new entry then set it */
+export function save(session: InsertSession): Promise<void>;
+export async function save(thing: SpeakerDurations | InsertSession) {
 	if ("interlocutors" in thing) {
-		const sessions = getAllSessions();
-		sessions.push(thing as Session);
-		localStorage.setItem(sessionsKey, JSON.stringify(sessions));
+		const id = await db.sessions.put(thing as InsertType<Session, "id">);
+		thing.id = id;
 	} else {
 		localStorage.setItem(interlocutorsKey, JSON.stringify(thing));
 	}
 }
 
-export function getAllSessions(): Session[] {
-	return JSON.parse(localStorage.getItem(sessionsKey) ?? "[]");
-}
-
-export function getSessionsWith(person: string) {
-	return getAllSessions().filter(session => person in session.interlocutors);
+export function getSessionsWith(person: Name) {
+	return db.sessions.where("interlocutors")
+		.equals(person)
+		.toArray();
 }
 
 /** Gets session with specified date. If nonexistant, returns blank session */
-export function getDatedSession(date: string) {
-	return getAllSessions().filter(session => date === session.date)[0] ?? {
-		interlocutors: {},
+export async function getDatedSession(date: SessionDate) {
+	return (await db.sessions.get({ date })) ?? {
+		interlocutors: [] as Name[],
 		date: date,
-		duration: 0,
-	};
+		totalDuration: 0,
+		speakerDurations: {} as SpeakerDurations,
+	} satisfies InsertSession;
 }
