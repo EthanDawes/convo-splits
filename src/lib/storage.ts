@@ -14,18 +14,18 @@ export type SpeakerDurations = Record<Name, Duration>;
 
 export interface Session {
 	// IndexedDB id (autoincremented)
-	id: number,
+	id: number;
 	// Date the session started
-	date: SessionDate,
+	date: SessionDate;
 	// Length of yap sesh in seconds
-	totalDuration: Duration,
+	totalDuration: Duration;
 	// All conversation participants (identical to keys of `speakerDurations`, useful for indexed search)
-	interlocutors: Name[],
+	interlocutors: Name[];
 	// Since people can speak simultaneously, this can be greater than `duration`
-	speakerDurations: SpeakerDurations,
+	speakerDurations: SpeakerDurations;
 }
 
-const interlocutorsKey = "interlocutors";
+const interlocutorsKey = 'interlocutors';
 
 export const db = new Dexie('ConvoSplitDatabase') as Dexie & {
 	sessions: EntityTable<
@@ -36,20 +36,20 @@ export const db = new Dexie('ConvoSplitDatabase') as Dexie & {
 
 // Schema declaration:
 db.version(1).stores({
-	sessions: '++id, date, totalDuration, *interlocutors',
+	sessions: '++id, date, totalDuration, *interlocutors'
 });
 
 export function getPeople(): SpeakerDurations {
-	return JSON.parse(localStorage.getItem(interlocutorsKey) ?? "{}");
+	return JSON.parse(localStorage.getItem(interlocutorsKey) ?? '{}');
 }
 
-type InsertSession = InsertType<Session, "id">;
+type InsertSession = InsertType<Session, 'id'>;
 export function save(people: SpeakerDurations): Promise<void>;
 /** Saves or updates a session. If `id` unset, will create new entry then set it */
 export function save(session: InsertSession): Promise<void>;
 export async function save(thing: SpeakerDurations | InsertSession) {
-	if ("interlocutors" in thing) {
-		const id = await db.sessions.put(thing as InsertType<Session, "id">);
+	if ('interlocutors' in thing) {
+		const id = await db.sessions.put(thing as InsertType<Session, 'id'>);
 		thing.id = id;
 	} else {
 		localStorage.setItem(interlocutorsKey, JSON.stringify(thing));
@@ -57,17 +57,18 @@ export async function save(thing: SpeakerDurations | InsertSession) {
 }
 
 export function getSessionsWith(person: Name) {
-	return db.sessions.where("interlocutors")
-		.equals(person)
-		.toArray();
+	return db.sessions.where('interlocutors').equals(person).toArray();
 }
 
 /** Gets session with specified date. If nonexistant, returns blank session */
 export async function getDatedSession(date: SessionDate) {
-	return (await db.sessions.get({ date })) ?? {
-		interlocutors: [] as Name[],
-		date: date,
-		totalDuration: 0,
-		speakerDurations: {} as SpeakerDurations,
-	} satisfies InsertSession;
+	return (
+		(await db.sessions.get({ date })) ??
+		({
+			interlocutors: [] as Name[],
+			date: date,
+			totalDuration: 0,
+			speakerDurations: {} as SpeakerDurations
+		} satisfies InsertSession)
+	);
 }

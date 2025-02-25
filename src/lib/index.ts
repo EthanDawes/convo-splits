@@ -3,5 +3,5 @@
 import { writable } from 'svelte/store';
 
 export function promiseStore<T>(initial: T, promise: Promise<T>) {
-	return writable(initial, set => void promise.then(set));
+	return writable(initial, (set) => void promise.then(set));
 }
