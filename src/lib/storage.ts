@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable, type InsertType } from 'dexie';
+import { readable } from 'svelte/store';
 
 // Seconds elapsed
 export type Duration = number;
@@ -55,6 +56,10 @@ export async function save(thing: SpeakerDurations | InsertSession) {
 		localStorage.setItem(interlocutorsKey, JSON.stringify(thing));
 	}
 }
+
+export const allSessions = readable<Session[]>([], (_set, update) => {
+	db.sessions.each((session) => update((old) => [...old, session]));
+});
 
 export function getSessionsWith(person: Name) {
 	return db.sessions.where('interlocutors').equals(person).toArray();
