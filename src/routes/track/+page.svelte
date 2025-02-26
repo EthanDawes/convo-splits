@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { getDatedSession, save, type SpeakerDurations } from '$lib/storage';
+	import { getDatedSession, type Name, save, type SpeakerDurations } from '$lib/storage';
 	import { promiseStore } from '$lib';
 
 	const searchOptions = new URLSearchParams(location.search);
-	const people = searchOptions.get('people')!.split(',');
+	const people: Name[] = searchOptions.get('people')!.split(',');
 
 	if (!searchOptions.get('session')) {
 		searchOptions.set('session', String(new Date().getTime()));
@@ -15,6 +15,7 @@
 		null,
 		getDatedSession(startTime).then((session) => {
 			populateMissingSpeakerDurations(session.speakerDurations);
+			session.interlocutors = Array.from(new Set([...session.interlocutors, ...people]));
 			return session;
 		})
 	);
@@ -35,15 +36,26 @@
 		isLandscape = window.innerWidth > window.innerHeight;
 	}
 
-	function handleSpeakerBegin(person: string) {
+	function handleSpeakerBegin(person: Name) {
+		// Prevent overriding from multiple firings of keydown event
+		if (speakingSince[person]) return;
+
 		speakingSince[person] = new Date().getTime();
 	}
 
-	function handleSpeakerEnd(person: string) {
-		if (!$session) return;
-		$session.speakerDurations[person] += (new Date().getTime() - speakingSince[person]) / 1000;
+	function handleSpeakerEnd(person: Name) {
+		// Ignore if session not yet loaded from db, or user pressed key out of range, resulting in undefined
+		if (!$session || person == undefined) return;
+
+		const now = new Date().getTime();
+		$session.speakerDurations[person] += (now - speakingSince[person]) / 1000;
 		speakingSince[person] = 0;
+		$session.totalDuration = (now - $session.date) / 1000;
 		save($session);
+	}
+
+	function keybindToPerson(ev: KeyboardEvent): Name {
+		return people[Number(ev.key) - 1];
 	}
 
 	/** User tried to click the name */
@@ -70,8 +82,11 @@
 			class:h-full={isLandscape}
 			class:bg-gray-300={speakingSince[person]}
 			on:touchstart|preventDefault={handleSpeakerBegin.bind(null, person)}
-			on:mousedown={handleMouseDown}
 			on:touchend|preventDefault={handleSpeakerEnd.bind(null, person)}
+			on:mousedown|preventDefault={handleSpeakerBegin.bind(null, person)}
+			on:mouseup|preventDefault={handleSpeakerEnd.bind(null, person)}
+			on:mouseenter|preventDefault={(ev) => ev.buttons && handleSpeakerBegin(person)}
+			on:mouseleave|preventDefault={(ev) => ev.buttons && handleSpeakerEnd(person)}
 			role="button"
 		>
 			<strong>{person}</strong>
@@ -83,4 +98,8 @@
 </div>
 
 <svelte:window on:resize={calcLandscape} />
-<svelte:document on:contextmenu|preventDefault={() => {}} />
+<svelte:document
+	on:contextmenu|preventDefault={() => {}}
+	on:keydown|preventDefault={(ev) => handleSpeakerBegin(keybindToPerson(ev))}
+	on:keyup|preventDefault={(ev) => handleSpeakerEnd(keybindToPerson(ev))}
+/>
