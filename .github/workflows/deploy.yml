@@ -1,0 +1,34 @@
+name: Build and Deploy
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-and-deploy:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4.1.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm & install deps
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: true
+      - name: Build 🔧 # This example project is built using npm and outputs the result to the 'build' folder. Replace with the commands required to build your project, or remove this step entirely if your site is pre-built.
+        env:
+          BASE_PATH: '/${{ github.event.repository.name }}'
+        run: |
+          cd web
+          npm run build
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4.4.3
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: web/build # The folder the action should deploy.
