@@ -18,7 +18,7 @@
 		const people = Object.keys(selectedPeople)
 			.filter((person) => selectedPeople[person])
 			.join(',');
-		goto(`/track?people=${people}`);
+		goto(`./track?people=${people}`);
 	}
 </script>
 
